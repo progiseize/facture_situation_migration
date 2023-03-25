@@ -18,7 +18,7 @@ Disponible sûr : Windows - MacOS - Linux
 ## Liens
 
 - Support & Assistance : Sur le forum
-- Demo : à venir
+- Demo : À venir
 - Documentation : à venir
 - Projet GitHub : [Projet Digirisk](https://github.com/progiseize/facture_situation_migration)
 - Forum : [Forum Digirisk](https://www.dolibarr.fr/forum/t/gif-facture-de-situation/41868)
@@ -35,7 +35,7 @@ Disponible sûr : Windows - MacOS - Linux
 ### Méthode 1 :
 
 - Depuis le menu "Déployer/Installer un module externe" de Dolibarr :
-- Glisser l'archive ZIP 'module_digiriskdolibarr-X.Y.Z' et cliquer sur "ENVOYER FICHIER"
+- Glisser l'archive ZIP 'module_xxxxdolibarr-X.Y.Z' et cliquer sur "ENVOYER FICHIER"
 - Activer le module dans la liste des Modules/Applications installés
 
 ### Méthode 2 :
