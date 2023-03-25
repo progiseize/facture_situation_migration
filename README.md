@@ -1,86 +1,50 @@
-# FACTURESITUATIONMIGRATION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
+# FACTURE SITUATION MIGRATION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## Features
+## Fonctionnalités
 
-Description of the module...
+Amélioration des factures de situation
 
-<!--
-![Screenshot facturesituationmigration](img/screenshot_facturesituationmigration.png?raw=true "FactureSituationMigration"){imgmd}
--->
+## Informations
 
-Other external modules are available on [Dolistore.com](https://www.dolistore.com).
+Numéro du module : 43XXX
+Version : 0.0.1
+Dernière mise à jour : JJ/MM/2023
+Éditeur : Progiseize
+Compatibilité : Dolibarr 15.0.0 - 17.0.0
+Thème : Eldy Menu
+Licence : GPLv3
+Disponible sûr : Windows - MacOS - Linux
 
-## Translations
+## Liens
 
-Translations can be completed manually by editing files into directories *langs*.
+- Support & Assistance : Sur le forum
+- Demo : à venir
+- Documentation : à venir
+- Projet GitHub : [Projet Digirisk](https://github.com/progiseize/facture_situation_migration)
+- Forum : [Forum Digirisk](https://www.dolibarr.fr/forum/t/gif-facture-de-situation/41868)
+- Wiki : [Wiki](https://wiki.dolibarr.org/index.php?title=GIF_-_Facture_de_situation_2022)
+- Modules à venir
 
-<!--
-This module contains also a sample configuration for Transifex, under the hidden directory [.tx](.tx), so it is possible to manage translation using this service.
 
-For more informations, see the [translator's documentation](https://wiki.dolibarr.org/index.php/Translator_documentation).
+## Traduction
 
-There is a [Transifex project](https://transifex.com/projects/p/dolibarr-module-template) for this module.
--->
-
-<!--
+- Français
 
 ## Installation
 
-### From the ZIP file and GUI interface
+### Méthode 1 :
 
-If the module is a ready to deploy zip file, so with a name module_xxx-version.zip (like when downloading it from a market place like [Dolistore](https://www.dolistore.com)),
-go into menu ```Home - Setup - Modules - Deploy external module``` and upload the zip file.
+- Depuis le menu "Déployer/Installer un module externe" de Dolibarr :
+- Glisser l'archive ZIP 'module_digiriskdolibarr-X.Y.Z' et cliquer sur "ENVOYER FICHIER"
+- Activer le module dans la liste des Modules/Applications installés
 
-Note: If this screen tell you that there is no "custom" directory, check that your setup is correct:
+### Méthode 2 :
 
-- In your Dolibarr installation directory, edit the ```htdocs/conf/conf.php``` file and check that following lines are not commented:
-
-    ```php
-    //$dolibarr_main_url_root_alt ...
-    //$dolibarr_main_document_root_alt ...
-    ```
-
-- Uncomment them if necessary (delete the leading ```//```) and assign a sensible value according to your Dolibarr installation
-
-    For example :
-
-    - UNIX:
-        ```php
-        $dolibarr_main_url_root_alt = '/custom';
-        $dolibarr_main_document_root_alt = '/var/www/Dolibarr/htdocs/custom';
-        ```
-
-    - Windows:
-        ```php
-        $dolibarr_main_url_root_alt = '/custom';
-        $dolibarr_main_document_root_alt = 'C:/My Web Sites/Dolibarr/htdocs/custom';
-        ```
-
-### From a GIT repository
-
-Clone the repository in ```$dolibarr_main_document_root_alt/facturesituationmigration```
-
-```sh
-cd ....../custom
-git clone git@github.com:gitlogin/facturesituationmigration.git facturesituationmigration
+- Dans le dossier "dolibarr/htdocs/custom" copier la ligne suivante :
 ```
-
-### <a name="final_steps"></a>Final steps
-
-From your browser:
-
-  - Log into Dolibarr as a super-administrator
-  - Go to "Setup" -> "Modules"
-  - You should now be able to find and enable the module
-
--->
+git clone https://github.com/Evarisk/facture_situation_migration.git digiriskdolibarr
+```
 
 ## Licenses
 
-### Main code
-
 GPLv3 or (at your option) any later version. See file COPYING for more information.
-
-### Documentation
-
-All texts and readmes are licensed under GFDL.
