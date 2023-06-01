@@ -144,7 +144,7 @@ switch ($action):
 		if($result > 0):
 			dolibarr_set_const($db,'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP','3','chaine',0,'','0');
 			dolibarr_set_const($db,'FACTURESITUATIONMIGRATION_ISDONE','1','chaine',0,'','0');
-			dolibarr_set_const($db,'INVOICE_USE_SITUATION','2','chaine',0,'','1');
+			$migration->setConstSituNewMethod();
 			$step_migration = 3;
 			setEventMessage('Step3 done','mesgs');
 		// ERROR, ALL IS NOT DONE, WE CAN RETRY
@@ -177,11 +177,6 @@ print load_fiche_titre($langs->trans($page_name), $linkback, 'title_setup');
 $head = facturesituationmigrationAdminPrepareHead();
 print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, "facturesituationmigration@facturesituationmigration");
 echo '<span class="opacitymedium">'.$langs->trans("FactureSituationMigrationSetupPage").'</span><br><br>';
-
-
-//
-
-
 ?>
 
 <table class="noborder centpercent">
@@ -248,8 +243,6 @@ echo '<span class="opacitymedium">'.$langs->trans("FactureSituationMigrationSetu
 			</td>
 		</tr>
 		<?php endif; ?>
-
-		<?php var_dump($step_migration); ?>
 
 		<!-- STEP 4 -->
 		<?php if ($step_migration >= 3): ?>

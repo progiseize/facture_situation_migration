@@ -44,6 +44,11 @@ class FactureSituationMigration {
     public $table_facturedet = 'facturedet';
 
     /**
+     * @var string Table const
+     */
+    public $table_const = 'const';
+
+    /**
      * @var DoliDB Database handler.
      */
     public $db;
@@ -175,7 +180,7 @@ class FactureSituationMigration {
         $sql.= " WHERE done = '0'";
 
         $res = $this->db->query($sql);
-        if($res){
+        if($res):
 
             // RETURN 1 IF ALL ALREADY DONE
             if($res->num_rows == 0): return 1; endif;
@@ -187,7 +192,7 @@ class FactureSituationMigration {
             $nb_update_error = 0;
 
             // POUR CHAQUE CYCLE
-            while ($obj = $this->db->fetch_object($res)){ $nb_update++;
+            while ($obj = $this->db->fetch_object($res)): $nb_update++;
 
                 $sql_bis = "SELECT";
                 $sql_bis.= " f.rowid as facture_id, f.ref as facture_ref, f.situation_cycle_ref as facture_cycle_ref, f.situation_counter as facture_situation_counter, f.situation_final as facture_situation_final";
@@ -201,7 +206,7 @@ class FactureSituationMigration {
                 //echo $sql_bis.'<br>';
                 
                 $res_bis = $this->db->query($sql_bis);
-                if($res_bis){
+                if($res_bis):
 
                     // POUR CHAQUE CYCLE
                     while ($obj_bis = $this->db->fetch_object($res_bis)){
@@ -311,8 +316,8 @@ class FactureSituationMigration {
                     if(!$cycle_update_error): $nb_update_success++; $this->db->commit();
                     else: $nb_update_error++;  $this->db->rollback(); endif; 
                     
-                }
-            }
+                endif;
+            endwhile;
 
             // SI TOUT EST FAIT
             if($nb_update == $nb_update_success): return 2;
@@ -321,9 +326,21 @@ class FactureSituationMigration {
             // TOUT EN ERREUR
             elseif($nb_update == $nb_update_error): return -2;
             endif;
+        endif;
+    }
 
-        }
+    /**
+     *  Set INVOICE_USE_SITUATION to 2 for all entities WHERE INVOICE_USE_SITUATION == 1
+     */
+    public function setConstSituNewMethod($all_entities = 1){
 
+        $sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_const;
+        $sql.= " SET value='2'";
+        $sql.= " WHERE name = 'INVOICE_USE_SITUATION' AND value = '1'";
+
+        $res = $this->db->query($sql);
+        if(!$res): return 0; endif;
+        return 1;
     }
     
 }
