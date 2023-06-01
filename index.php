@@ -91,8 +91,6 @@ if (isset($user->socid) && $user->socid > 0) {
  * Actions
  */
 
-// None
-
 
 /*
  * View
