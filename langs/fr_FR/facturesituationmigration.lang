@@ -27,11 +27,13 @@ ModuleFactureSituationMigrationDesc = FactureSituationMigration description
 #
 FactureSituationMigrationSetup = FactureSituationMigration setup
 Settings = Settings
-FactureSituationMigrationSetupPage = Cette page permet de migrer les données des factures de situation de la table llx_facturedet. Il est vivement recommandé de ne pas créer de nouvelles factures durant le processus.
+FactureSituationMigrationSetupPage = Cette page permet de migrer les données des factures de situation de la table llx_facturedet. Il est vivement recommandé de ne pas créer de nouvelles factures durant le processus.<br> Il est également conseillé de mettre la constante MAIN_SECURITY_CSRF_TOKEN_RENEWAL_ON_EACH_CALL à 1 le temps de réaliser les manipulations.
 
 FactureSituationMigrationStep1Desc = Sauvegarde de la table llx_facturedet dans la table llx_facture_situation_migration_backup
 FactureSituationMigrationStep2Desc = Préparation d'une table (llx_facture_situation_migration) pour checker ce qui est fait ou non
 FactureSituationMigrationStep3Desc = Conversion des données de la table llx_facturedet
+FactureSituationMigrationStep4Desc = Rollback / Confirmation
+FactureSituationMigrationCyclesDone = Cycles de facture traités
 
 
 #
