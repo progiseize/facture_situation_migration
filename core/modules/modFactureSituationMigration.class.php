@@ -72,7 +72,7 @@ class modFactureSituationMigration extends DolibarrModules
 		$this->editor_url = 'https://progiseize.fr';
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '0.1';
+		$this->version = '0.2';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -159,8 +159,8 @@ class modFactureSituationMigration extends DolibarrModules
 		//                             2 => array('FACTURESITUATIONMIGRATION_MYNEWCONST2', 'chaine', 'myvalue', 'This is another constant to add', 0, 'current', 1)
 		// );
 		$this->const = array(
-			1 => array('FACTURESITUATIONMIGRATION_ISDONE', 'chaine', '0', '', 0,'allentities',0),
-			2 => array('MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP', 'chaine', '0', '', 0,'allentities',0),
+			1 => array('FACTURESITUATIONMIGRATION_ISDONE', 'chaine', '0', '', 0,'current',0),
+			2 => array('MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP', 'chaine', '0', '', 0,'current',0),
 		);
 
 		// Some keys to add into the overwriting translation tables
