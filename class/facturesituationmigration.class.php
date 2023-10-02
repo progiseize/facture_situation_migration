@@ -322,7 +322,7 @@ class FactureSituationMigration {
 
                             // Pour chaque ligne de la facture
                             foreach($cycle_infos['lines'] as $line_id => $line_infos): 
-
+                                
                                 // Check if special code or subtotal
                                 if($line_infos['special_code'] == '104777'): continue; endif;
                                 // Check if is a previous id
@@ -330,13 +330,13 @@ class FactureSituationMigration {
 
                                 $factureline_update++;
 
-                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent'] = floatval($line_infos['line_percent']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['line_percent']);
-                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht'] = floatval($line_infos['ligne_total_ht']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht']);
-                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva'] = floatval($line_infos['ligne_total_tva']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva']);
-                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc'] = floatval($line_infos['ligne_total_ttc']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc']);
-                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht'] = floatval($line_infos['multicurrency_ligne_total_ht']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht']);
-                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva'] = floatval($line_infos['multicurrency_ligne_total_tva']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva']);
-                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc'] = floatval($line_infos['multicurrency_ligne_total_ttc']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc']);
+                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent'] = number_format(floatval($line_infos['line_percent']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['line_percent']),4,'.','');
+                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht'] = number_format(floatval($line_infos['ligne_total_ht']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht']),8,'.','');
+                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva'] = number_format(floatval($line_infos['ligne_total_tva']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva']),8,'.','');
+                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc'] = number_format(floatval($line_infos['ligne_total_ttc']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc']),8,'.','');
+                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht'] = number_format(floatval($line_infos['multicurrency_ligne_total_ht']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht']),8,'.','');
+                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva'] = number_format(floatval($line_infos['multicurrency_ligne_total_tva']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva']),8,'.','');
+                                $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc'] = number_format(floatval($line_infos['multicurrency_ligne_total_ttc']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc']),8,'.','');
 
                                 //var_dump('------------- NEW HT:'.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht'].'€ || '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent'].'%');
 
