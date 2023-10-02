@@ -170,6 +170,7 @@ switch ($action):
 			if($result_rollback > 0): header('Location:'.$_SERVER['PHP_SELF']); endif;
 		elseif ($removebackup): 
 			var_dump('REMOVE BACKUP');
+			//dolibarr_set_const($db,'FACTURESITUATIONMIGRATION_ISDONE','1','chaine',0,'',$conf->entity);
 		endif;
 	break;
 
