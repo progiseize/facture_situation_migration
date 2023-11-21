@@ -87,10 +87,8 @@ $setupnotempty = 0;
 
 $migration = new FactureSituationMigration($db);
 $step_migration = getDolGlobalInt('MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP');
-
 /*
  * Actions */
-
 
 switch ($action):
 
@@ -103,6 +101,7 @@ switch ($action):
 			dolibarr_set_const($db,'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP','1','chaine',0,'',$conf->entity);
 			$step_migration = 1;
 			setEventMessage('Step1 done','mesgs');
+			dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=1',LOG_DEBUG,0,'_situationmigration');
 		// CAN'T CREATE TABLE
 		elseif($result == -1):
 			setEventMessage($langs->trans('Error1'),'errors');
@@ -124,6 +123,10 @@ switch ($action):
 			dolibarr_set_const($db,'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP','2','chaine',0,'',$conf->entity);
 			$step_migration = 2;
 			setEventMessage('Step2 done','mesgs');
+			dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=2',LOG_DEBUG,0,'_situationmigration');
+		// AUCUNE MIGRATION NECESSAIRE
+		elseif($result == 0):
+			setEventMessage('No Migration needed','mesgs');
 		// ERROR SQL
 		elseif($result == -1):
 			setEventMessage($langs->trans('Error'),'errors');
@@ -150,6 +153,11 @@ switch ($action):
 				dolibarr_set_const($db,'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP','3','chaine',0,'',$conf->entity);
 				dolibarr_set_const($db,'FACTURESITUATIONMIGRATION_ISDONE','1','chaine',0,'',$conf->entity);
 				dolibarr_set_const($db,'INVOICE_USE_SITUATION','2','chaine',0,'',$conf->entity);
+
+				dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=3',LOG_DEBUG,0,'_situationmigration');
+				dol_syslog('constant FACTURESITUATIONMIGRATION_ISDONE=1',LOG_DEBUG,0,'_situationmigration');
+				dol_syslog('constant INVOICE_USE_SITUATION=2',LOG_DEBUG,0,'_situationmigration');
+
 				$step_migration = 3;
 				setEventMessage('Step3 done','mesgs');
 			endif;
@@ -169,8 +177,7 @@ switch ($action):
 			$result_rollback = $migration->rollbackMigration(); 
 			if($result_rollback > 0): header('Location:'.$_SERVER['PHP_SELF']); endif;
 		elseif ($removebackup): 
-			var_dump('REMOVE BACKUP');
-			//dolibarr_set_const($db,'FACTURESITUATIONMIGRATION_ISDONE','1','chaine',0,'',$conf->entity);
+			setEventMessages('REMOVE BACKUP TO DO','','warnings');
 		endif;
 	break;
 

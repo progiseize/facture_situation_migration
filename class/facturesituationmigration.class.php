@@ -68,6 +68,11 @@ class FactureSituationMigration {
      */
     public $cycle_limit = 50;
 
+    /**
+     * @var bool log_detail
+     */
+    private $log_detail = 0;
+
 
 
     /**
@@ -127,21 +132,33 @@ class FactureSituationMigration {
         // IF ALREADY DONE
         if(isset($conf->global->MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP) && intval($conf->global->MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP) > 0): return -3; endif;
 
-        // CREATE
-        $sql_create = "CREATE TABLE IF NOT EXISTS ".MAIN_DB_PREFIX.$this->table_backupdet." LIKE ".MAIN_DB_PREFIX.$this->table_facturedet;
-        $result_create = $this->db->query($sql_create);
-        if(!$result_create): return -1; endif;
+        dol_syslog('START MIGRATION STEP 1',LOG_DEBUG,0,'_situationmigration');        
 
+        // CREATE
+        dol_syslog('Create a backup table ('.MAIN_DB_PREFIX.$this->table_backupdet.')',LOG_DEBUG,0,'_situationmigration');
+        $sql_create = "CREATE TABLE IF NOT EXISTS ".MAIN_DB_PREFIX.$this->table_backupdet." LIKE ".MAIN_DB_PREFIX.$this->table_facturedet;
+        dol_syslog('sql='.$sql_create,LOG_DEBUG,0,'_situationmigration');        
+        $result_create = $this->db->query($sql_create);
+        if(!$result_create): 
+            dol_syslog('Error create backup table'.$sql_create,LOG_ERR,0,'_situationmigration');
+            return -1; 
+        endif;
+        
         // BACKUP
+        dol_syslog('Store '.MAIN_DB_PREFIX.'_facturedet into backup table ('.MAIN_DB_PREFIX.$this->table_backupdet.')',LOG_DEBUG,0,'_situationmigration');
         $sql_copy = "INSERT INTO ".MAIN_DB_PREFIX.$this->table_backupdet;
         $sql_copy .= " SELECT fd.* FROM ".MAIN_DB_PREFIX.$this->table_facturedet." as fd";
         $sql_copy .= " INNER JOIN ".MAIN_DB_PREFIX.$this->table_facture." as f ON f.rowid = fd.fk_facture";
         $sql_copy .= " WHERE f.entity = '".$conf->entity."'";
         $sql_copy .= " AND f.type = '".facture::TYPE_SITUATION."'";
-
+        dol_syslog('sql='.$sql_copy,LOG_DEBUG,0,'_situationmigration');
         $result_copy = $this->db->query($sql_copy);
-        if(!$result_copy): return -2; endif;
+        if(!$result_copy): 
+            dol_syslog('Error copy _facturedet into backup table'.$sql_create,LOG_ERR,0,'_situationmigration');
+            return -2;
+        endif;
 
+        dol_syslog('END MIGRATION STEP 1',LOG_DEBUG,0,'_situationmigration'); 
         return 1;
     }
 
@@ -153,10 +170,14 @@ class FactureSituationMigration {
 
         global $conf;
 
+        dol_syslog('START MIGRATION STEP 2',LOG_DEBUG,0,'_situationmigration');
+
         // On récupère tous les identifiants des factures de situations
+        dol_syslog('Select all situation invoices with cycle ref',LOG_DEBUG,0,'_situationmigration');
         $sql = "SELECT rowid, entity, situation_cycle_ref FROM ".MAIN_DB_PREFIX.$this->table_facture;
         $sql.= " WHERE type = '".facture::TYPE_SITUATION."' AND entity = '".$conf->entity."'";
         $res = $this->db->query($sql);
+        dol_syslog('sql='.$sql,LOG_DEBUG,0,'_situationmigration');
 
         if($res){
 
@@ -165,6 +186,9 @@ class FactureSituationMigration {
 
                 $insert_success = 0;
                 $insert_exist = 0;
+
+                dol_syslog('Result : '.$res->num_rows.' invoices founded',LOG_DEBUG,0,'_situationmigration');
+                dol_syslog('We store results in migration table ('.MAIN_DB_PREFIX.$this->table_migration.')',LOG_DEBUG,0,'_situationmigration');
 
                 while ($obj = $this->db->fetch_object($res)){
                     
@@ -175,33 +199,52 @@ class FactureSituationMigration {
                     $sql_insert.= "'".$this->db->escape($obj->entity)."',";
                     $sql_insert.= "'0'";
                     $sql_insert.= ")";
+                    dol_syslog('sql='.$sql_insert,LOG_DEBUG,0,'_situationmigration');
 
                     $res_insert = $this->db->query($sql_insert);
                     if($res_insert){$insert_success++;}
                     elseif(!$res_insert && $this->db->db->lasterrno == 'DB_ERROR_RECORD_ALREADY_EXISTS'){
+                        dol_syslog('ID('.$obj->rowid.') already exist, we continue',LOG_DEBUG,0,'_situationmigration');
                         $insert_exist++;
                     }
                     
                 }
 
                 // SUCCES
-                if($insert_success == $res->num_rows){return 1;} 
+                if($insert_success == $res->num_rows){
+                    dol_syslog('Step2 result = 1 (All insert at the same time)',LOG_DEBUG,0,'_situationmigration');
+                    dol_syslog('END MIGRATION STEP 2',LOG_DEBUG,0,'_situationmigration');
+                    return 1;
+                }
                 // SUCCES EN CAS D'ERREURS PRECEDENTES
-                elseif($insert_success + $insert_exist == $res->num_rows && $insert_exist != $res->num_rows){ return 2;}
+                elseif($insert_success + $insert_exist == $res->num_rows && $insert_exist != $res->num_rows){ 
+                    dol_syslog('Step2 result = 2 (All insert ok, in several times)',LOG_DEBUG,0,'_situationmigration');
+                    dol_syslog('END MIGRATION STEP 2',LOG_DEBUG,0,'_situationmigration');
+                    return 2;
+                }
                 // AUCUNE INSERTION NECESSAIRE
-                elseif($insert_exist == $res->num_rows){ return 3;} 
+                elseif($insert_exist == $res->num_rows){
+                    dol_syslog('Step2 result = 3 (Reload step 2 with all results already stored, we can go to step 3)',LOG_DEBUG,0,'_situationmigration');
+                    dol_syslog('END MIGRATION STEP 2',LOG_DEBUG,0,'_situationmigration');
+                    return 3;
+                } 
                 // ERREUR INSERTION
                 else {
-                    $this->error = 'Erreur INSERT';
+                    $this->error = 'Error while process, reload step 2 please';
+                    dol_syslog('Error while process, we must reload step 2',LOG_WARNING,0,'_situationmigration');
                     return -2;
                 }
             } 
             // AUCUNE FACTURE DE SITUATION
-            else { return 0; }
+            else { 
+                dol_syslog('No cycles found, no migration needed',LOG_DEBUG,0,'_situationmigration');
+                return 0;
+            }
 
         // ERREUR SQL SELECT
         } else {
             $this->error = 'Erreur SQL';
+            dol_syslog('Error sql',LOG_ERR,0,'_situationmigration');
             return -1;
         }
     }
@@ -215,20 +258,25 @@ class FactureSituationMigration {
 
         global $conf;
 
+        dol_syslog('START MIGRATION STEP 3',LOG_DEBUG,0,'_situationmigration');
+
         // ON RECUPERE ET REGROUPE LES REFERENCES DE CYCLE
         $sql = "SELECT";
         $sql.= " DISTINCT situation_cycle_ref";
         $sql.= " FROM ".MAIN_DB_PREFIX.$this->table_migration; 
         $sql.= " WHERE done = '0'";
         $sql.= " AND entity = '".$conf->entity."' LIMIT ".$this->cycle_limit;
+        dol_syslog('We Select and group ref cycle not done',LOG_DEBUG,0,'_situationmigration');
+        dol_syslog('sql='.$sql,LOG_DEBUG,0,'_situationmigration');
 
         $res = $this->db->query($sql);
         if($res):
 
             // RETURN 1 IF ALL ALREADY DONE
-            if($res->num_rows == 0): return 1; endif;
-
-            //$cycle_array = array();
+            if($res->num_rows == 0): 
+                dol_syslog('All cycles are already done',LOG_DEBUG,0,'_situationmigration');
+                return 1; 
+            endif;
 
             $nb_update = 0;
             $nb_update_success = 0;
@@ -238,6 +286,7 @@ class FactureSituationMigration {
             $isset_fact = array();
 
             // POUR CHAQUE CYCLE
+            dol_syslog('For each cycle not done',LOG_DEBUG,0,'_situationmigration');
             while ($obj = $this->db->fetch_object($res)): $nb_update++;
 
                 $this->db->begin();
@@ -251,7 +300,8 @@ class FactureSituationMigration {
                 $sql_bis.= " INNER JOIN ".MAIN_DB_PREFIX.$this->table_facturedet." AS fd ON f.rowid = fd.fk_facture";
                 $sql_bis.= " WHERE situation_cycle_ref = '".$obj->situation_cycle_ref."' AND entity = '".$conf->entity."'";
                 $sql_bis.= " ORDER BY f.situation_cycle_ref DESC, f.situation_counter DESC";
-                
+                dol_syslog('START CYCLE_REF:: '.$obj->situation_cycle_ref,LOG_DEBUG,0,'_situationmigration');
+                dol_syslog('sql='.$sql_bis,LOG_DEBUG,0,'_situationmigration');
                 
                 $res_bis = $this->db->query($sql_bis);
                 if($res_bis):
@@ -291,8 +341,6 @@ class FactureSituationMigration {
                     /* -------------------------------------------------------- */
                     /* PARCOURS TABLEAU ----------------------------------- */
                     /* -------------------------------------------------------- */
-
-                    //var_dump('-----------------------------------------------------------------------');
                     //var_dump('-- CYCLE N°'.$obj->situation_cycle_ref);
                     //var_dump($cycle_array);
 
@@ -313,6 +361,8 @@ class FactureSituationMigration {
                         $factureline_update = 0;
                         $factureline_update_success = 0;
                         $factureline_update_error = 0;
+
+                        dol_syslog('SituationCounter::'.$cycle_counter.' ('.$cycle_infos['facture_ref'].')',LOG_DEBUG,0,'_situationmigration');
 
                         // Si on est sur une situation > 1 dans le cycle, on recalcule, la situation 1 est toujours correcte
                         if(intval($cycle_counter) > 1): 
@@ -338,6 +388,25 @@ class FactureSituationMigration {
                                 $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva'] = number_format(floatval($line_infos['multicurrency_ligne_total_tva']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva']),8,'.','');
                                 $cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc'] = number_format(floatval($line_infos['multicurrency_ligne_total_ttc']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc']),8,'.','');
 
+                                // LOGS
+                                if($this->log_detail > 0):
+                                    $log_percent = 'New Percent = Actual('.$line_infos['line_percent'].') - PreviousLine('.$cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['line_percent'].') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent'].'%';
+                                    $log_ht = 'New TotalHT = Actual('.floatval($line_infos['ligne_total_ht']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht'].'€';
+                                    $log_tva = 'New TotalTVA = Actual('.floatval($line_infos['ligne_total_tva']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva'].'€';
+                                    $log_ttc = 'New TotalTTC = Actual('.floatval($line_infos['ligne_total_ttc']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc'].'€';
+                                    $log_multiht = 'New MulticurrencyTotalHT = Actual('.floatval($line_infos['multicurrency_ligne_total_ht']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht'].'€';
+                                    $log_multitva = 'New MulticurrencyTotalTVA = Actual('.floatval($line_infos['multicurrency_ligne_total_tva']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva'].'€';
+                                    $log_multittc = 'New MulticurrencyTotalTTC = Actual('.floatval($line_infos['multicurrency_ligne_total_ttc']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc'].'€';
+                                    dol_syslog('Line::'.$line_id.' - PreviousLine::'.$line_infos['fk_prev_id'],LOG_DEBUG,0,'_situationmigration'); 
+                                    dol_syslog($log_percent,LOG_DEBUG,0,'_situationmigration');
+                                    dol_syslog($log_ht,LOG_DEBUG,0,'_situationmigration');
+                                    dol_syslog($log_tva,LOG_DEBUG,0,'_situationmigration');
+                                    dol_syslog($log_ttc,LOG_DEBUG,0,'_situationmigration');
+                                    dol_syslog($log_multiht,LOG_DEBUG,0,'_situationmigration');
+                                    dol_syslog($log_multitva,LOG_DEBUG,0,'_situationmigration');
+                                    dol_syslog($log_multittc,LOG_DEBUG,0,'_situationmigration');
+                                endif;
+
                                 //var_dump('------------- NEW HT:'.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht'].'€ || '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent'].'%');
 
                                 $sql_update = "UPDATE ".MAIN_DB_PREFIX.$this->table_facturedet." SET";
@@ -349,13 +418,15 @@ class FactureSituationMigration {
                                 $sql_update.= " multicurrency_total_tva = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva']."',";
                                 $sql_update.= " multicurrency_total_ttc = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc']."'";                                    
                                 $sql_update.= " WHERE rowid = '".$line_id."';";
+                                dol_syslog('sql='.$sql_update,LOG_DEBUG,0,'_situationmigration');
 
-                                //var_dump($cycle_infos['facture_id']);
-                                
                                 $res_update = $this->db->query($sql_update);
 
                                 if($res_update): $factureline_update_success++;
-                                else: $factureline_update_error++; endif;
+                                else: 
+                                    dol_syslog('Error SQL',LOG_ERR,0,'_situationmigration');
+                                    $factureline_update_error++;
+                                endif;
 
                             endforeach;
 
@@ -365,27 +436,41 @@ class FactureSituationMigration {
                             //var_dump('----- NB line: '.$factureline_update.' :: Success: '.$factureline_update_success.' | Err: '.$factureline_update_error);
 
                         else: 
+                            dol_syslog('We do nothing, first situation',LOG_DEBUG,0,'_situationmigration');
                             $facture_update_success ++; $this->setFactureDone($cycle_infos['facture_id']);
                             // foreach($cycle_infos['lines'] as $lid => $l): var_dump('-------- LIGNE ID:'.$lid.' ||  HT:'.$l['ligne_total_ht'].'€ || '.$l['line_percent'].'%'); endforeach;
                         endif;
 
                     endforeach;
 
-                    /*var_dump('---------------------------------');
-                    var_dump('NB fact cycle: '.$facture_update.' :: Success: '.$facture_update_success.' | Err: '.$facture_update_error);*/
+                    //var_dump('NB fact cycle: '.$facture_update.' :: Success: '.$facture_update_success.' | Err: '.$facture_update_error);
 
                     if($facture_update == $facture_update_success): $nb_update_success++; $this->db->commit();
-                    else: $nb_update_error++; $this->db->rollback(); endif;                        
+                    else: 
+                        dol_syslog('Error, so invoice and cycle can\'t be set done',LOG_ERR,0,'_situationmigration');
+                        $nb_update_error++; $this->db->rollback(); 
+                    endif;
                     
                 else: $nb_update_error++; $this->db->rollback(); endif;
+
+                dol_syslog('END CYCLEREF',LOG_DEBUG,0,'_situationmigration');
             endwhile;            
 
             // SI TOUT EST FAIT
-            if($nb_update == $nb_update_success): return $nb_update_success;
+            if($nb_update == $nb_update_success): 
+                dol_syslog('Step3 result = All success',LOG_DEBUG,0,'_situationmigration');
+                dol_syslog('END MIGRATION STEP 3',LOG_DEBUG,0,'_situationmigration');
+                return $nb_update_success;
             // SI RESULTATS POSITIFS ET NEGATIFS
-            elseif($nb_update_success > 0 && $nb_update_error > 0): return -1;
+            elseif($nb_update_success > 0 && $nb_update_error > 0): 
+                dol_syslog('Step3 result = Success and errors',LOG_ERR,0,'_situationmigration');
+                dol_syslog('END MIGRATION STEP 3',LOG_DEBUG,0,'_situationmigration');
+                return -1;
             // TOUT EN ERREUR
-            elseif($nb_update == $nb_update_error): return -2;
+            elseif($nb_update == $nb_update_error):
+                dol_syslog('Step3 result = All update errors',LOG_ERR,0,'_situationmigration');
+                dol_syslog('END MIGRATION STEP 3',LOG_DEBUG,0,'_situationmigration'); 
+                return -2;
             endif;
         endif;
     }
@@ -395,6 +480,8 @@ class FactureSituationMigration {
 
         global $conf;
 
+        dol_syslog('START MIGRATION ROLLBACK',LOG_DEBUG,0,'_situationmigration');
+
         $this->db->begin();
 
         $sql = "DELETE FROM ".MAIN_DB_PREFIX.$this->table_facturedet."";
@@ -402,24 +489,32 @@ class FactureSituationMigration {
             $sql.= "SELECT * FROM (SELECT fd.rowid FROM ".MAIN_DB_PREFIX.$this->table_facturedet." as fd";
             $sql.= " INNER JOIN ".MAIN_DB_PREFIX.$this->table_facture." as f ON f.rowid = fd.fk_facture AND f.type = '".facture::TYPE_SITUATION."') as tmp";
         $sql.= ")";
+        dol_syslog('sql='.$sql,LOG_DEBUG,0,'_situationmigration');
 
         $res = $this->db->query($sql);
         if(!$res): $this->db->rollback(); return - 1; endif;
 
         $sql2 = "INSERT ".MAIN_DB_PREFIX.$this->table_facturedet." SELECT * FROM ".MAIN_DB_PREFIX.$this->table_backupdet;
+        dol_syslog('sql='.$sql2,LOG_DEBUG,0,'_situationmigration');
+
         $res2 = $this->db->query($sql2);
         if(!$res2): $this->db->rollback(); return - 2; endif;
 
         if(!dolibarr_set_const($this->db,'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP','0','chaine',0,'',$conf->entity)): $this->db->rollback(); return -3; endif;
         if(!dolibarr_set_const($this->db,'FACTURESITUATIONMIGRATION_ISDONE','0','chaine',0,'',$conf->entity)): $this->db->rollback(); return -3; endif;
         if(!dolibarr_set_const($this->db,'INVOICE_USE_SITUATION','1','chaine',0,'',$conf->entity)): $this->db->rollback(); return -3; endif;
+        dol_syslog('Reset MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=0 || FACTURESITUATIONMIGRATION_ISDONE=0 || INVOICE_USE_SITUATION=1',LOG_DEBUG,0,'_situationmigration');
 
         // VIDER LES TABLES MIGRATION ET BACKUP
         $sql_migration = "DELETE FROM ".MAIN_DB_PREFIX.$this->table_migration;
+        dol_syslog('sql='.$sql_migration,LOG_DEBUG,0,'_situationmigration');
+
         $res_migration = $this->db->query($sql_migration);
         if(!$res_migration): $this->db->rollback(); return - 4; endif;
 
         $sql_backup = "DELETE FROM ".MAIN_DB_PREFIX.$this->table_backupdet;
+        dol_syslog('sql='.$sql_backup,LOG_DEBUG,0,'_situationmigration');
+
         $res_backup = $this->db->query($sql_backup);
         if(!$res_backup): $this->db->rollback(); return - 5; endif;
 

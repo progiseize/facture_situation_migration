@@ -1,5 +1,8 @@
 # CHANGELOG FACTURESITUATIONMIGRATION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 0.3
+NEW - Ajout entrées logs (dolibarr_situationmigration.log) - Plus de details avec FactureSituationMigration::log_detail = 1
+
 ## 0.2
 FIX - La migration est faite sur l'entité en cours. chaque entité doit effectuer la migration.
 FIX - Correction de la boucle du script de migration.
