@@ -90,26 +90,25 @@ $step_migration = getDolGlobalInt('MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP');
 /*
  * Actions */
 
-switch ($action):
-
+switch ($action) :
 	// ETAPE 1
-	case 'doStep1': 
+	case 'doStep1':
 		$result = $migration->migration_step_1();
 
 		// OK
-		if($result > 0):
-			dolibarr_set_const($db,'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP','1','chaine',0,'',$conf->entity);
+		if ($result > 0) :
+			dolibarr_set_const($db, 'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP', '1', 'chaine', 0, '', $conf->entity);
 			$step_migration = 1;
-			setEventMessage('Step1 done','mesgs');
-			dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=1',LOG_DEBUG,0,'_situationmigration');
-		// CAN'T CREATE TABLE
-		elseif($result == -1):
-			setEventMessage($langs->trans('Error1'),'errors');
-		// CAN'T BACKUP DATA
-		elseif($result == -2):
-			setEventMessage($langs->trans('Error2'),'errors');
-		elseif($result == -3):
-			setEventMessage($langs->trans('AlreadyDone'),'warnings');
+			setEventMessage('Step1 done', 'mesgs');
+			dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=1', LOG_DEBUG, 0, '_situationmigration');
+			// CAN'T CREATE TABLE
+		elseif ($result == -1) :
+			setEventMessage($langs->trans('Error1'), 'errors');
+			// CAN'T BACKUP DATA
+		elseif ($result == -2) :
+			setEventMessage($langs->trans('Error2'), 'errors');
+		elseif ($result == -3) :
+			setEventMessage($langs->trans('AlreadyDone'), 'warnings');
 		endif;
 
 	break;
@@ -119,20 +118,20 @@ switch ($action):
 		$result = $migration->migration_step_2();
 
 		// OK
-		if($result > 0):
-			dolibarr_set_const($db,'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP','2','chaine',0,'',$conf->entity);
+		if ($result > 0) :
+			dolibarr_set_const($db, 'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP', '2', 'chaine', 0, '', $conf->entity);
 			$step_migration = 2;
-			setEventMessage('Step2 done','mesgs');
-			dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=2',LOG_DEBUG,0,'_situationmigration');
-		// AUCUNE MIGRATION NECESSAIRE
-		elseif($result == 0):
-			setEventMessage('No Migration needed','mesgs');
-		// ERROR SQL
-		elseif($result == -1):
-			setEventMessage($langs->trans('Error'),'errors');
-		// ERROR INSERT
-		elseif($result == -2):
-			setEventMessage($langs->trans('Error'),'errors');
+			setEventMessage('Step2 done', 'mesgs');
+			dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=2', LOG_DEBUG, 0, '_situationmigration');
+			// AUCUNE MIGRATION NECESSAIRE
+		elseif ($result == 0) :
+			setEventMessage('No Migration needed', 'mesgs');
+			// ERROR SQL
+		elseif ($result == -1) :
+			setEventMessage($langs->trans('Error'), 'errors');
+			// ERROR INSERT
+		elseif ($result == -2) :
+			setEventMessage($langs->trans('Error'), 'errors');
 		endif;
 	break;
 
@@ -141,31 +140,29 @@ switch ($action):
 		$result = $migration->migration_step_3();
 
 		// Si fonction ok
-		if($result >= 0):
-
+		if ($result >= 0) :
 			//
-			setEventMessage('Success','mesgs');
+			setEventMessage('Success', 'mesgs');
 
 			// On check combien il en reste
 			$count_todo = $migration->countMigrationToDo();
 
-			if($count_todo == 0):
-				dolibarr_set_const($db,'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP','3','chaine',0,'',$conf->entity);
-				dolibarr_set_const($db,'FACTURESITUATIONMIGRATION_ISDONE','1','chaine',0,'',$conf->entity);
-				dolibarr_set_const($db,'INVOICE_USE_SITUATION','2','chaine',0,'',$conf->entity);
+			if ($count_todo == 0) :
+				dolibarr_set_const($db, 'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP', '3', 'chaine', 0, '', $conf->entity);
+				dolibarr_set_const($db, 'FACTURESITUATIONMIGRATION_ISDONE', '1', 'chaine', 0, '', $conf->entity);
+				dolibarr_set_const($db, 'INVOICE_USE_SITUATION', '2', 'chaine', 0, '', $conf->entity);
 
-				dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=3',LOG_DEBUG,0,'_situationmigration');
-				dol_syslog('constant FACTURESITUATIONMIGRATION_ISDONE=1',LOG_DEBUG,0,'_situationmigration');
-				dol_syslog('constant INVOICE_USE_SITUATION=2',LOG_DEBUG,0,'_situationmigration');
+				dol_syslog('constant MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP=3', LOG_DEBUG, 0, '_situationmigration');
+				dol_syslog('constant FACTURESITUATIONMIGRATION_ISDONE=1', LOG_DEBUG, 0, '_situationmigration');
+				dol_syslog('constant INVOICE_USE_SITUATION=2', LOG_DEBUG, 0, '_situationmigration');
 
 				$step_migration = 3;
-				setEventMessage('Step3 done','mesgs');
+				setEventMessage('Step3 done', 'mesgs');
 			endif;
-
-		elseif($result == -1):
-			setEventMessage($langs->trans('RetryAllIsNotDone'),'warnings');
-		elseif($result == -2):
-			setEventMessage($langs->trans('Error'),'errors');
+		elseif ($result == -1) :
+			setEventMessage($langs->trans('RetryAllIsNotDone'), 'warnings');
+		elseif ($result == -2) :
+			setEventMessage($langs->trans('Error'), 'errors');
 		endif;
 	break;
 
@@ -173,20 +170,19 @@ switch ($action):
 		$setrollback = GETPOSTISSET('setrollback')?1:0;
 		$removebackup = GETPOSTISSET('removebackup')?1:0;
 
-		if($setrollback):
-			$result_rollback = $migration->rollbackMigration(); 
-			if($result_rollback > 0): header('Location:'.$_SERVER['PHP_SELF']); endif;
-		elseif ($removebackup): 
-			setEventMessages('REMOVE BACKUP TO DO','','warnings');
+		if ($setrollback) :
+			$result_rollback = $migration->rollbackMigration();
+			if ($result_rollback > 0) : header('Location:'.$_SERVER['PHP_SELF']); endif;
+		elseif ($removebackup) :
+			setEventMessages('REMOVE BACKUP TO DO', '', 'warnings');
 		endif;
 	break;
-
 endswitch;
 
 
 
-// 
-if($step_migration >= 2):
+//
+if ($step_migration >= 2) :
 	$count_todo = $migration->countMigrationToDo();
 	$count_all = $migration->countMigrationAll();
 	$count_done = $count_all - $count_todo;
@@ -224,17 +220,17 @@ echo '<span class="opacitymedium">'.$langs->trans("FactureSituationMigrationSetu
 
 		<!-- STEP 1 -->
 		<tr class="oddeven">
-			<td><?php echo $langs->trans('StepNb',1); ?></td>
+			<td><?php echo $langs->trans('StepNb', 1); ?></td>
 			<td><?php echo $langs->trans('FactureSituationMigrationStep1Desc'); ?></td>
 			
 			<td class="right">
-				<?php if($step_migration == 0): ?>
+				<?php if ($step_migration == 0) : ?>
 					<form method="POST" action="<?php echo $_SERVER['PHP_SELF']; ?>">
 						<input type="hidden" name="token" value="<?php echo newtoken(); ?>">
 						<input type="hidden" name="action" value="doStep1">
-						<input type="submit" class="button small reposition" value="<?php echo $langs->trans('StepNb',1); ?>">
+						<input type="submit" class="button small reposition" value="<?php echo $langs->trans('StepNb', 1); ?>">
 					</form>
-				<?php elseif($step_migration > 0): echo $langs->trans('ActionDoneShort').' <i class="fas fa-check" style="color:green"></i>'; endif; ?>
+				<?php elseif ($step_migration > 0) : echo $langs->trans('ActionDoneShort').' <i class="fas fa-check" style="color:green"></i>'; endif; ?>
 			</td>
 			
 			<!-- <td class="center">
@@ -245,54 +241,54 @@ echo '<span class="opacitymedium">'.$langs->trans("FactureSituationMigrationSetu
 		</tr>
 
 		<!-- STEP 2 -->
-		<?php if ($step_migration >= 1): ?>
+		<?php if ($step_migration >= 1) : ?>
 		<tr class="oddeven">
-			<td><?php echo $langs->trans('StepNb',2); ?></td>
+			<td><?php echo $langs->trans('StepNb', 2); ?></td>
 			<td><?php echo $langs->trans('FactureSituationMigrationStep2Desc'); ?></td>
 			<td class="right">
-				<?php if($step_migration == 1): ?>
+				<?php if ($step_migration == 1) : ?>
 					<form method="POST" action="<?php echo $_SERVER['PHP_SELF']; ?>">
 						<input type="hidden" name="token" value="<?php echo newtoken(); ?>">
 						<input type="hidden" name="action" value="doStep2">
-						<input type="submit" class="button small reposition" value="<?php echo $langs->trans('StepNb',2); ?>">
+						<input type="submit" class="button small reposition" value="<?php echo $langs->trans('StepNb', 2); ?>">
 					</form>
-				<?php elseif($step_migration > 1): echo $langs->trans('ActionDoneShort').' <i class="fas fa-check" style="color:green"></i>'; endif; ?>
+				<?php elseif ($step_migration > 1) : echo $langs->trans('ActionDoneShort').' <i class="fas fa-check" style="color:green"></i>'; endif; ?>
 			</td>
 		</tr>
 		<?php endif; ?>
 
 		<!-- STEP 3 -->
-		<?php if ($step_migration >= 2): ?>
+		<?php if ($step_migration >= 2) : ?>
 		<tr class="oddeven">
-			<td><?php echo $langs->trans('StepNb',3); ?></td>
+			<td><?php echo $langs->trans('StepNb', 3); ?></td>
 			<td><?php echo $langs->trans('FactureSituationMigrationStep3Desc'); ?></td>
 			<td class="right">
 				<span class="paddingright"><?php echo $langs->trans('FactureSituationMigrationCyclesDone').': '.$count_done.' / '.$count_all; ?></span>
-				<?php if($step_migration == 2): ?>
+				<?php if ($step_migration == 2) : ?>
 					<form method="POST" action="<?php echo $_SERVER['PHP_SELF']; ?>" style="display:inline-block;">
 						<input type="hidden" name="token" value="<?php echo newtoken(); ?>">
 						<input type="hidden" name="action" value="doStep3">
-						<input type="submit" class="button small reposition" value="<?php echo $langs->trans('StepNb',3); ?>">
+						<input type="submit" class="button small reposition" value="<?php echo $langs->trans('StepNb', 3); ?>">
 					</form>
-				<?php elseif($step_migration > 2): echo $langs->trans('ActionDoneShort').' <i class="fas fa-check" style="color:green"></i>'; endif; ?>
+				<?php elseif ($step_migration > 2) : echo $langs->trans('ActionDoneShort').' <i class="fas fa-check" style="color:green"></i>'; endif; ?>
 			</td>
 		</tr>
 		<?php endif; ?>
 
 		<!-- STEP 4 -->
-		<?php if ($step_migration >= 3): ?>
+		<?php if ($step_migration >= 3) : ?>
 		<tr class="oddeven">
-			<td><?php echo $langs->trans('StepNb',4); ?></td>
+			<td><?php echo $langs->trans('StepNb', 4); ?></td>
 			<td><?php echo $langs->trans('FactureSituationMigrationStep4Desc'); ?></td>
 			<td class="right">
-				<?php if($step_migration == 3): ?>
+				<?php if ($step_migration == 3) : ?>
 					<form method="POST" action="<?php echo $_SERVER['PHP_SELF']; ?>">
 						<input type="hidden" name="token" value="<?php echo newtoken(); ?>">
 						<input type="hidden" name="action" value="doStep4">
 						<input type="submit" name="setrollback" class="button small reposition" value="<?php echo $langs->trans('Rollback'); ?>">
 						<input type="submit" name="removebackup" class="button small reposition" value="<?php echo $langs->trans('Supprimer données backup / Terminer'); ?>">
 					</form>
-				<?php elseif($step_migration > 3): echo $langs->trans('ActionDoneShort').' <i class="fas fa-check" style="color:green"></i>'; endif; ?>
+				<?php elseif ($step_migration > 3) : echo $langs->trans('ActionDoneShort').' <i class="fas fa-check" style="color:green"></i>'; endif; ?>
 			</td>
 		</tr>
 		<?php endif; ?>
