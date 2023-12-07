@@ -39,6 +39,10 @@ function facturesituationmigrationAdminPrepareHead()
 	$h = 0;
 	$head = array();
 
+	$head[$h][0] = dol_buildpath("/facturesituationmigration/admin/config.php", 1);
+	$head[$h][1] = $langs->trans("Config");
+	$head[$h][2] = 'config';
+	$h++;
 	$head[$h][0] = dol_buildpath("/facturesituationmigration/admin/setup.php", 1);
 	$head[$h][1] = $langs->trans("Settings");
 	$head[$h][2] = 'settings';

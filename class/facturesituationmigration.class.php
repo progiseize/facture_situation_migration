@@ -85,6 +85,23 @@ class FactureSituationMigration
 		$this->db = is_object($_db) ? $_db : $db;
 	}
 
+	/**
+	 * put -1 as flag on done field to mark errors
+	 *
+	 * @param   [type]  $facture_id  [$facture_id description]
+	 *
+	 * @return  [type]               [return description]
+	 */
+	public function setFactureError($facture_id)
+	{
+		$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_migration;
+		$sql.= " SET done = -1 ";
+		$sql.= " WHERE rowid = '".$this->db->escape($facture_id)."'";
+		$res = $this->db->query($sql);
+		if (!$res) : return 0; endif;
+		return 1;
+	}
+
 	public function setFactureDone($facture_id)
 	{
 
@@ -168,6 +185,43 @@ class FactureSituationMigration
 	}
 
 	/**
+	 * retourne la liste des sequences concernees par la migration:
+	 * cycle non terminé ou terminé cette année
+	 *
+	 * @return  [type]  [return description]
+	 */
+	public function get_sequences_to_migrate()
+	{
+		$ret = [];
+		if (getDolGlobalString('FACTURESITUATIONMIGRATION_CURRENT_YEAR', '') == '') {
+			return null;
+		}
+		$sql = "SELECT DISTINCT situation_cycle_ref FROM ".MAIN_DB_PREFIX."facture";
+		$res = $this->db->query($sql);
+		if ($res) {
+			while ($obj = $this->db->fetch_object($res)) {
+				if (!empty($obj->situation_cycle_ref)) {
+					$sql2 = "SELECT rowid,situation_counter,situation_final,situation_cycle_ref,YEAR(datef) as year FROM ".MAIN_DB_PREFIX."facture WHERE situation_cycle_ref='" . $obj->situation_cycle_ref . "' ORDER BY situation_counter DESC LIMIT 1";
+					$res2 = $this->db->query($sql2);
+					if ($res2) {
+						$obj2 = $this->db->fetch_object($res2);
+						// if ($obj2->situation_final == 0 && $obj2->year > (date('Y') - 1)) {
+						//     dol_syslog('  Add that cycle number '.$obj2->situation_cycle_ref.' to migration due to cycle not ended and last invoice edited in '.$obj2->year,LOG_DEBUG,0,'_situationmigration');
+						//     $ret[] = $obj2->situation_cycle_ref;
+						// }
+						//les cycles en cours ou terminés cette année
+						if ($obj2->year == date('Y')) {
+							dol_syslog('  Add that cycle number '.$obj2->situation_cycle_ref.' to migration due to cycle not ended and last invoice edited in '.$obj2->year, LOG_DEBUG, 0, '_situationmigration');
+							$ret[] = $obj2->situation_cycle_ref;
+						}
+					}
+				}
+			}
+		}
+		return implode(',', $ret);
+	}
+
+	/**
 	 *  Store ID facture_situation into facture_situation_migration
 	 *  in order to check if migration is done
 	 */
@@ -182,6 +236,11 @@ class FactureSituationMigration
 		dol_syslog('Select all situation invoices with cycle ref', LOG_DEBUG, 0, '_situationmigration');
 		$sql = "SELECT rowid, entity, situation_cycle_ref FROM ".MAIN_DB_PREFIX.$this->table_facture;
 		$sql.= " WHERE type = '".facture::TYPE_SITUATION."' AND entity = '".$conf->entity."'";
+		//uniquement une certaine selection de factures
+		$liste_seq_operate = $this->get_sequences_to_migrate();
+		if (null !== $liste_seq_operate) {
+			$sql.= " AND situation_cycle_ref IN(".$liste_seq_operate.")";
+		}
 		$res = $this->db->query($sql);
 		dol_syslog('sql='.$sql, LOG_DEBUG, 0, '_situationmigration');
 
@@ -254,8 +313,10 @@ class FactureSituationMigration
 	 *  Convert DATA to the new method by cycle_ref
 	 *  situation_percent, total_ht, total_tva, total_ttc, multicurrency_total_ht, multicurrency_total_tva, multicurrency_total_ttc
 	 *  localtax ?
+	 *
+	 *  $listOfErrors : tableau de liste des factures pour lesquelles un pb est arrivé
 	 */
-	public function migration_step_3()
+	public function migration_step_3(&$listOfErrors)
 	{
 
 		global $conf;
@@ -316,6 +377,8 @@ class FactureSituationMigration
 					while ($obj_bis = $this->db->fetch_object($res_bis)) {
 						if (!isset($cycle_array[$obj_bis->facture_situation_counter])) {
 							$cycle_array[$obj_bis->facture_situation_counter] = array(
+								'facture_year' => $obj_bis->facture_year,
+								'situation_final' => $obj_bis->situation_final,
 								'facture_id' => $obj_bis->facture_id,
 								'facture_ref' => $obj_bis->facture_ref,
 								'lines' => array(),
@@ -351,12 +414,20 @@ class FactureSituationMigration
 					// TRI DECROISSANT
 					krsort($cycle_array);
 
+					// print json_encode($cycle_array);exit;
 					// POUR CHAQUE SITUATION DU CYCLE
 					foreach ($cycle_array as $cycle_counter => $cycle_infos) : $facture_update++;
 
+						if ($cycle_infos['situation_final'] == 1 && $cycle_infos['facture_year'] < date('Y')) {
+							dol_syslog('SituationCounter::'.$cycle_counter.' ('.$cycle_infos['facture_ref'].') is final and year ['.$cycle_infos['facture_year'].'] is less than current year, do not migrate', LOG_DEBUG, 0, '_situationmigration');
+							$facture_update_success ++; $this->setFactureDone($cycle_infos['facture_id']);
+							continue;
+						}
+						// print json_encode($cycle_infos);exit;
 						//
 						//var_dump('---- SITU '.$cycle_counter.' :: '.count($cycle_infos['lines']).' lignes :: '.$cycle_infos['facture_id'].' :: '.$cycle_infos['facture_ref']);
 
+						$facture_ref = $cycle_infos['facture_ref'];
 						$factureline_update = 0;
 						$factureline_update_success = 0;
 						$factureline_update_error = 0;
@@ -370,31 +441,59 @@ class FactureSituationMigration
 
 							// Pour chaque ligne de la facture
 							foreach ($cycle_infos['lines'] as $line_id => $line_infos) :
+								//plus facile à suivre, l'id de la ligne sur la facture précédente
+								$fk_prev_id = $line_infos['fk_prev_id'];
+								//et la ligne complète
+								$prev_line_infos = $cycle_array[$cycle_counter_before]['lines'][$fk_prev_id];
+								$prev_facture_ref = $cycle_array[$cycle_counter_before]['facture_ref'];
+
 								// Check if special code or subtotal
 								if ($line_infos['special_code'] == '104777') : continue; endif;
 								// Check if is a previous id
-								if (empty($line_infos['fk_prev_id'])) : continue; endif;
+								if (empty($fk_prev_id)) : continue; endif;
 
 								$factureline_update++;
+								if (!isset($line_infos['line_percent'])) {
+									dol_syslog('Invoice::' . $facture_ref . ' - Line::'.$line_id.' - PreviousInvoice::'. $prev_facture_ref.' - PreviousLine::'.$fk_prev_id." ERROR: line_percent is not set (a)", LOG_ERR, 0, '_situationmigration');
+									$factureline_update_error++;
+								} else {
+									$percent = $line_infos['line_percent'];
+									$this->_handle_line_percent_value($percent, $line_id, $fk_prev_id, $line_infos, $factureline_update_error);
+								}
+								if (!isset($prev_line_infos['line_percent'])) {
+									dol_syslog('Invoice::' .$cycle_infos['facture_ref'] . ' - Line::'.$line_id.' - PreviousInvoice::'. $prev_facture_ref.' - PreviousLine::'.$fk_prev_id." ERROR: prev cycle counter line_percent is not set (b)", LOG_ERR, 0, '_situationmigration');
+									$factureline_update_error++;
+								} else {
+									$percent = $prev_line_infos['line_percent'];
+									$this->_handle_line_percent_value($percent, $line_id, $fk_prev_id, $prev_line_infos, $factureline_update_error);
+								}
 
-								$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent'] = number_format(floatval($line_infos['line_percent']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['line_percent']), 4, '.', '');
-								$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht'] = number_format(floatval($line_infos['ligne_total_ht']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht']), 8, '.', '');
-								$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva'] = number_format(floatval($line_infos['ligne_total_tva']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva']), 8, '.', '');
-								$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc'] = number_format(floatval($line_infos['ligne_total_ttc']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc']), 8, '.', '');
-								$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht'] = number_format(floatval($line_infos['multicurrency_ligne_total_ht']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht']), 8, '.', '');
-								$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva'] = number_format(floatval($line_infos['multicurrency_ligne_total_tva']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva']), 8, '.', '');
-								$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc'] = number_format(floatval($line_infos['multicurrency_ligne_total_ttc']) - floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc']), 8, '.', '');
+								dol_syslog('Invoice::' . $cycle_infos['facture_ref'] . ' - Line::'.$line_id.' - PreviousInvoice::'. $prev_facture_ref.' - factureline_update_error='.$factureline_update_error, LOG_ERR, 0, '_situationmigration');
+								if ($factureline_update_error > 0) {
+									$listOfErrors[] = $cycle_infos['facture_ref'];
+									$this->setFactureError($cycle_infos['facture_id']);
+									$nb_update_success++; $this->db->commit();
+									continue 2;
+								}
+
+								$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['line_percent'] = number_format(floatval($line_infos['line_percent']) - floatval($prev_line_infos['line_percent']), 2, '.', '');
+								$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_ht'] = number_format(floatval($line_infos['ligne_total_ht']) - floatval($prev_line_infos['ligne_total_ht']), 2, '.', '');
+								$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_tva'] = number_format(floatval($line_infos['ligne_total_tva']) - floatval($prev_line_infos['ligne_total_tva']), 2, '.', '');
+								$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_ttc'] = number_format(floatval($line_infos['ligne_total_ttc']) - floatval($prev_line_infos['ligne_total_ttc']), 2, '.', '');
+								$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_ht'] = number_format(floatval($line_infos['multicurrency_ligne_total_ht']) - floatval($prev_line_infos['multicurrency_ligne_total_ht']), 2, '.', '');
+								$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_tva'] = number_format(floatval($line_infos['multicurrency_ligne_total_tva']) - floatval($prev_line_infos['multicurrency_ligne_total_tva']), 2, '.', '');
+								$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_ttc'] = number_format(floatval($line_infos['multicurrency_ligne_total_ttc']) - floatval($prev_line_infos['multicurrency_ligne_total_ttc']), 2, '.', '');
 
 								// LOGS
 								if ($this->log_detail > 0) :
-									$log_percent = 'New Percent = Actual('.$line_infos['line_percent'].') - PreviousLine('.$cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['line_percent'].') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent'].'%';
-									$log_ht = 'New TotalHT = Actual('.floatval($line_infos['ligne_total_ht']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht'].'€';
-									$log_tva = 'New TotalTVA = Actual('.floatval($line_infos['ligne_total_tva']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva'].'€';
-									$log_ttc = 'New TotalTTC = Actual('.floatval($line_infos['ligne_total_ttc']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc'].'€';
-									$log_multiht = 'New MulticurrencyTotalHT = Actual('.floatval($line_infos['multicurrency_ligne_total_ht']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht'].'€';
-									$log_multitva = 'New MulticurrencyTotalTVA = Actual('.floatval($line_infos['multicurrency_ligne_total_tva']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva'].'€';
-									$log_multittc = 'New MulticurrencyTotalTTC = Actual('.floatval($line_infos['multicurrency_ligne_total_ttc']).') - PreviousLine('.floatval($cycle_array[$cycle_counter_before]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc']).') = '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc'].'€';
-									dol_syslog('Line::'.$line_id.' - PreviousLine::'.$line_infos['fk_prev_id'], LOG_DEBUG, 0, '_situationmigration');
+									$log_percent = 'New Percent = Actual('.$line_infos['line_percent'].') - PreviousLine('.$prev_line_infos['line_percent'].') = '.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['line_percent'].'%';
+									$log_ht = 'New TotalHT = Actual('.floatval($line_infos['ligne_total_ht']).') - PreviousLine('.floatval($prev_line_infos['ligne_total_ht']).') = '.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_ht'].'€';
+									$log_tva = 'New TotalTVA = Actual('.floatval($line_infos['ligne_total_tva']).') - PreviousLine('.floatval($prev_line_infos['ligne_total_tva']).') = '.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_tva'].'€';
+									$log_ttc = 'New TotalTTC = Actual('.floatval($line_infos['ligne_total_ttc']).') - PreviousLine('.floatval($prev_line_infos['ligne_total_ttc']).') = '.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_ttc'].'€';
+									$log_multiht = 'New MulticurrencyTotalHT = Actual('.floatval($line_infos['multicurrency_ligne_total_ht']).') - PreviousLine('.floatval($prev_line_infos['multicurrency_ligne_total_ht']).') = '.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_ht'].'€';
+									$log_multitva = 'New MulticurrencyTotalTVA = Actual('.floatval($line_infos['multicurrency_ligne_total_tva']).') - PreviousLine('.floatval($prev_line_infos['multicurrency_ligne_total_tva']).') = '.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_tva'].'€';
+									$log_multittc = 'New MulticurrencyTotalTTC = Actual('.floatval($line_infos['multicurrency_ligne_total_ttc']).') - PreviousLine('.floatval($prev_line_infos['multicurrency_ligne_total_ttc']).') = '.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_ttc'].'€';
+									dol_syslog('Invoice::' . $cycle_infos['facture_ref'] . ' - Line::'.$line_id.' - PreviousLine::'.$fk_prev_id, LOG_DEBUG, 0, '_situationmigration');
 									dol_syslog($log_percent, LOG_DEBUG, 0, '_situationmigration');
 									dol_syslog($log_ht, LOG_DEBUG, 0, '_situationmigration');
 									dol_syslog($log_tva, LOG_DEBUG, 0, '_situationmigration');
@@ -404,16 +503,16 @@ class FactureSituationMigration
 									dol_syslog($log_multittc, LOG_DEBUG, 0, '_situationmigration');
 								endif;
 
-								//var_dump('------------- NEW HT:'.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht'].'€ || '.$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent'].'%');
+								//var_dump('------------- NEW HT:'.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_ht'].'€ || '.$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['line_percent'].'%');
 
 								$sql_update = "UPDATE ".MAIN_DB_PREFIX.$this->table_facturedet." SET";
-								$sql_update.= " situation_percent = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['line_percent']."',";
-								$sql_update.= " total_ht = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ht']."',";
-								$sql_update.= " total_tva = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_tva']."',";
-								$sql_update.= " total_ttc = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['ligne_total_ttc']."',";
-								$sql_update.= " multicurrency_total_ht = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ht']."',";
-								$sql_update.= " multicurrency_total_tva = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_tva']."',";
-								$sql_update.= " multicurrency_total_ttc = '".$cycle_array[$cycle_counter]['lines'][$line_infos['fk_prev_id']]['multicurrency_ligne_total_ttc']."'";
+								$sql_update.= " situation_percent = '".$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['line_percent']."',";
+								$sql_update.= " total_ht = '".$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_ht']."',";
+								$sql_update.= " total_tva = '".$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_tva']."',";
+								$sql_update.= " total_ttc = '".$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['ligne_total_ttc']."',";
+								$sql_update.= " multicurrency_total_ht = '".$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_ht']."',";
+								$sql_update.= " multicurrency_total_tva = '".$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_tva']."',";
+								$sql_update.= " multicurrency_total_ttc = '".$cycle_array[$cycle_counter]['lines'][$fk_prev_id]['multicurrency_ligne_total_ttc']."'";
 								$sql_update.= " WHERE rowid = '".$line_id."';";
 								dol_syslog('sql='.$sql_update, LOG_DEBUG, 0, '_situationmigration');
 
@@ -514,5 +613,39 @@ class FactureSituationMigration
 
 		$this->db->commit();
 		return 1;
+	}
+
+	/**
+	 * factorisation de gestion des pourcentages "foireux"
+	 *
+	 * @param   [type]  $percent       valeur du poucentage
+	 * @param   [type]  $lineID        id de la ligne
+	 * @param   [type]  $linePrevID    id de la ligne précédente
+	 * @param   [type]  $lineInfos     line info modifiable
+	 * @param   [type]  $update_error  flag de gestion du nombre d'erreurs
+	 *
+	 * @return  [type]                 [return description]
+	 */
+	private function _handle_line_percent_value($percent, $lineID, $linePrevID, &$lineInfos, &$update_error)
+	{
+		if ($percent > 100) {
+			if (getDolGlobalString('FACTURESITUATIONMIGRATION_PERCENT_MORE_100', '') != '') {
+				dol_syslog('Line::'.$lineID.' - PreviousLine::'.$linePrevID." ERROR: line_percent is > 100", LOG_ERR, 0, '_situationmigration');
+				$update_error++;
+			}
+			if (getDolGlobalString('FACTURESITUATIONMIGRATION_PERCENT_MORE_100_FIX', '') != '') {
+				dol_syslog('Line::'.$lineID.' - PreviousLine::'.$linePrevID." FIX: line_percent is > 100, force to 100", LOG_ERR, 0, '_situationmigration');
+				$lineInfos['line_percent'] = 100;
+			}
+		} elseif ($percent < 0) {
+			if (getDolGlobalString('FACTURESITUATIONMIGRATION_PERCENT_LESS_0', '') != '') {
+				dol_syslog('Line::'.$lineID.' - PreviousLine::'.$linePrevID." ERROR: line_percent is < 0", LOG_ERR, 0, '_situationmigration');
+				$update_error++;
+			}
+			if (getDolGlobalString('FACTURESITUATIONMIGRATION_PERCENT_LESS_0_FIX', '') != '') {
+				dol_syslog('Line::'.$lineID.' - PreviousLine::'.$linePrevID." FIX: line_percent is < 0, force to 0", LOG_ERR, 0, '_situationmigration');
+				$lineInfos['line_percent'] = 0;
+			}
+		}
 	}
 }
