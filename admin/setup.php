@@ -137,7 +137,8 @@ switch ($action) :
 
 	// ETAPE 3
 	case 'doStep3':
-		$result = $migration->migration_step_3();
+		$errorList = [];
+		$result = $migration->migration_step_3($errorList);
 
 		// Si fonction ok
 		if ($result >= 0) :
@@ -160,9 +161,9 @@ switch ($action) :
 				setEventMessage('Step3 done', 'mesgs');
 			endif;
 		elseif ($result == -1) :
-			setEventMessage($langs->trans('RetryAllIsNotDone'), 'warnings');
+			setEventMessage($langs->trans('RetryAllIsNotDone') . implode(', ', $errorList), 'warnings');
 		elseif ($result == -2) :
-			setEventMessage($langs->trans('Error'), 'errors');
+			setEventMessage($langs->trans('Error') . implode(', ', $errorList), 'errors');
 		endif;
 	break;
 
