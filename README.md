@@ -42,7 +42,7 @@ Disponible sûr : Windows - MacOS - Linux
 
 - Dans le dossier "dolibarr/htdocs/custom" copier la ligne suivante :
 ```
-git clone https://github.com/Evarisk/facture_situation_migration.git digiriskdolibarr
+git clone https://github.com/Evarisk/facture_situation_migration.git facturesituationmigration
 ```
 
 ## Licenses
