@@ -264,7 +264,7 @@ class FactureSituationMigration
 					dol_syslog('sql='.$sql_insert, LOG_DEBUG, 0, '_situationmigration');
 
 					$res_insert = $this->db->query($sql_insert);
-					if ($res_insert) {$insert_success++;} elseif (!$res_insert && $this->db->db->lasterrno == 'DB_ERROR_RECORD_ALREADY_EXISTS') {
+					if ($res_insert) {$insert_success++;} elseif (!$res_insert && $this->db->lasterrno == 'DB_ERROR_RECORD_ALREADY_EXISTS') {
 						dol_syslog('ID('.$obj->rowid.') already exist, we continue', LOG_DEBUG, 0, '_situationmigration');
 						$insert_exist++;
 					}
@@ -354,7 +354,7 @@ class FactureSituationMigration
 				$this->db->begin();
 
 				$sql_bis = "SELECT";
-				$sql_bis.= " f.rowid as facture_id, f.ref as facture_ref, f.situation_cycle_ref as facture_cycle_ref, f.situation_counter as facture_situation_counter, f.situation_final as facture_situation_final";
+				$sql_bis.= " f.rowid as facture_id, f.ref as facture_ref, f.situation_cycle_ref as facture_cycle_ref, f.situation_counter as facture_situation_counter, f.situation_final as facture_situation_final, YEAR(f.datef) as facture_year";
 				$sql_bis.= " , fd.rowid as ligne_id, fd.situation_percent as ligne_percent, fd.fk_prev_id as ligne_prev_id";
 				$sql_bis.= " , fd.subprice as ligne_subprice, fd.total_ht as ligne_total_ht, fd.total_tva as ligne_total_tva, fd.total_ttc as ligne_total_ttc, fd.special_code as special_code";
 				$sql_bis.= " , fd.multicurrency_subprice as ligne_multicurrency_subprice, fd.multicurrency_total_ht as ligne_multicurrency_total_ht, fd.multicurrency_total_tva as ligne_multicurrency_total_tva, fd.multicurrency_total_ttc as ligne_multicurrency_total_ttc";
@@ -378,7 +378,7 @@ class FactureSituationMigration
 						if (!isset($cycle_array[$obj_bis->facture_situation_counter])) {
 							$cycle_array[$obj_bis->facture_situation_counter] = array(
 								'facture_year' => $obj_bis->facture_year,
-								'situation_final' => $obj_bis->situation_final,
+								'situation_final' => $obj_bis->facture_situation_final,
 								'facture_id' => $obj_bis->facture_id,
 								'facture_ref' => $obj_bis->facture_ref,
 								'lines' => array(),
@@ -406,6 +406,16 @@ class FactureSituationMigration
 					//var_dump('-- CYCLE N°'.$obj->situation_cycle_ref);
 					//var_dump($cycle_array);
 
+					// Si aucune ligne trouvée (factures vides/brouillons sans lignes), on marque tout le cycle comme done
+					if (empty($cycle_array)) {
+						dol_syslog('Cycle '.$obj->situation_cycle_ref.' has no lines (empty drafts), marking all invoices as done', LOG_DEBUG, 0, '_situationmigration');
+						$sql_mark = "UPDATE ".MAIN_DB_PREFIX.$this->table_migration." SET done = 1 WHERE situation_cycle_ref = '".$this->db->escape($obj->situation_cycle_ref)."' AND entity = '".$conf->entity."'";
+						$this->db->query($sql_mark);
+						$nb_update_success++;
+						$this->db->commit();
+						continue;
+					}
+
 					//
 					$facture_update = 0;
 					$facture_update_success = 0;
@@ -413,6 +423,11 @@ class FactureSituationMigration
 
 					// TRI DECROISSANT
 					krsort($cycle_array);
+
+					// Mark done any invoices in this cycle that were lost due to duplicate situation_counter
+					// (cycle_array is keyed by counter, so duplicates overwrite each other)
+					$sql_orphans = "UPDATE ".MAIN_DB_PREFIX.$this->table_migration." SET done = 1 WHERE situation_cycle_ref = '".$this->db->escape($obj->situation_cycle_ref)."' AND entity = '".$conf->entity."' AND rowid NOT IN ('".implode("','", array_column($cycle_array, 'facture_id'))."') AND done = 0";
+					$this->db->query($sql_orphans);
 
 					// print json_encode($cycle_array);exit;
 					// POUR CHAQUE SITUATION DU CYCLE
@@ -443,6 +458,7 @@ class FactureSituationMigration
 							foreach ($cycle_infos['lines'] as $line_id => $line_infos) :
 								//plus facile à suivre, l'id de la ligne sur la facture précédente
 								$fk_prev_id = $line_infos['fk_prev_id'];
+								if (empty($fk_prev_id) || !isset($cycle_array[$cycle_counter_before]['lines'][$fk_prev_id])) { continue; }
 								//et la ligne complète
 								$prev_line_infos = $cycle_array[$cycle_counter_before]['lines'][$fk_prev_id];
 								$prev_facture_ref = $cycle_array[$cycle_counter_before]['facture_ref'];
