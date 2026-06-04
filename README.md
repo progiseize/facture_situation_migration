@@ -2,28 +2,25 @@
 
 ## Fonctionnalités
 
-Amélioration des factures de situation
+Migration des factures de situation du format v1 (cumul) vers le format v2 (delta).
 
 ## Informations
 
-Numéro du module : 43XXX
-Version : 0.0.1
-Dernière mise à jour : JJ/MM/2023
+Numéro du module : 500000
+Version : 0.3
+Dernière mise à jour : 2023
 Éditeur : Progiseize
-Compatibilité : Dolibarr 15.0.0 - 17.0.0
+Compatibilité : Dolibarr 15.0.0 - 19.0.x
 Thème : Eldy Menu
 Licence : GPLv3
-Disponible sûr : Windows - MacOS - Linux
+Disponible sur : Windows - MacOS - Linux
 
 ## Liens
 
 - Support & Assistance : Sur le forum
-- Demo : À venir
-- Documentation : à venir
-- Projet GitHub : [Projet Digirisk](https://github.com/progiseize/facture_situation_migration)
-- Forum : [Forum Digirisk](https://www.dolibarr.fr/forum/t/gif-facture-de-situation/41868)
+- Projet GitHub : [facture_situation_migration](https://github.com/progiseize/facture_situation_migration)
+- Forum : [GIF Facture de situation](https://www.dolibarr.fr/forum/t/gif-facture-de-situation/41868)
 - Wiki : [Wiki](https://wiki.dolibarr.org/index.php?title=GIF_-_Facture_de_situation_2022)
-- Modules à venir
 
 
 ## Traduction
