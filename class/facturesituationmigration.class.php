@@ -593,10 +593,16 @@ class FactureSituationMigration
 
 		$this->db->begin();
 
+		$sql = "SET FOREIGN_KEY_CHECKS=0;";
+		$this->db->query($sql);
+
+		// TODO this rollback restore all entities (Multicompany)
+
 		$sql = "DELETE FROM ".MAIN_DB_PREFIX.$this->table_facturedet."";
 		$sql.= " WHERE rowid IN (";
 			$sql.= "SELECT * FROM (SELECT fd.rowid FROM ".MAIN_DB_PREFIX.$this->table_facturedet." as fd";
-			$sql.= " INNER JOIN ".MAIN_DB_PREFIX.$this->table_facture." as f ON f.rowid = fd.fk_facture AND f.type = '".facture::TYPE_SITUATION."') as tmp";
+			$sql.= " INNER JOIN ".MAIN_DB_PREFIX.$this->table_facture." as f ON f.rowid = fd.fk_facture AND f.type = '"Facture::TYPE_SITUATION."'";
+			$sql.= " INNER JOIN ".MAIN_DB_PREFIX.$this->table_migration." as m ON m.rowid = f.rowid) as tmp"; // compare to avoid delete new invoices created after migration
 		$sql.= ")";
 		dol_syslog('sql='.$sql, LOG_DEBUG, 0, '_situationmigration');
 
@@ -608,6 +614,9 @@ class FactureSituationMigration
 
 		$res2 = $this->db->query($sql2);
 		if (!$res2) : $this->db->rollback(); return - 2; endif;
+
+		$sql = "SET FOREIGN_KEY_CHECKS=1;";
+		$this->db->query($sql);
 
 		if (!dolibarr_set_const($this->db, 'MAIN_MODULE_FACTURESITUATIONMIGRATION_STEP', '0', 'chaine', 0, '', $conf->entity)) : $this->db->rollback(); return -3; endif;
 		if (!dolibarr_set_const($this->db, 'FACTURESITUATIONMIGRATION_ISDONE', '0', 'chaine', 0, '', $conf->entity)) : $this->db->rollback(); return -3; endif;
